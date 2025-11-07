@@ -23,12 +23,9 @@ export async function POST(request: NextRequest, { params }: { params: { olympia
 
     const attemptId = attempts[0].id
 
-    // Get correct answers from questions
-    const questionIds = Object.keys(answers)
-    const correctAnswersData = await sql`
+    const correctAnswersData = (await sql`
       SELECT id, correct_option FROM questions WHERE id = ANY($1::uuid[])
-    `,
-      [questionIds]
+    `) as any
 
     const correctAnswers: Record<string, number> = {}
     correctAnswersData.forEach((q: any) => {
