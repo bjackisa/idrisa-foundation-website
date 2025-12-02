@@ -1,6 +1,5 @@
 import { cookies } from "next/headers"
-import { jwtVerify } from "@/lib/jose"
-import { SignJWT } from "jose"
+import { jwtVerify, jwtSign } from "@/lib/jose"
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key-change-in-production")
 
@@ -12,11 +11,7 @@ export interface ParticipantSession {
 
 export async function createParticipantSession(guardianId: string, email: string, fullName: string) {
   const session: ParticipantSession = { guardianId, email, fullName }
-  const token = await new SignJWT(session)
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("30d")
-    .sign(secret)
+  const token = await jwtSign(session, secret)
   const cookieStore = await cookies()
   cookieStore.set("participant_session", token, {
     httpOnly: true,
