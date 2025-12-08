@@ -2,11 +2,12 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
+import { Suspense } from "react"
 
 const UGANDA_DISTRICTS = [
   "Kampala", "Wakiso", "Mukono", "Entebbe", "Mpigi", "Masaka", "Jinja", "Soroti", "Kigezi", 
@@ -24,7 +25,7 @@ const SCHOLARSHIP_TYPES = [
 
 type Step = "personal" | "academic" | "financial" | "documents"
 
-export default function ScholarshipSignup() {
+function ScholarshipSignupContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const scholarshipType = searchParams.get("type") || "full-tuition"
@@ -678,5 +679,25 @@ export default function ScholarshipSignup() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function ScholarshipSignup() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center p-4 py-12">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4 text-white font-bold text-2xl">
+              IF
+            </div>
+            <h1 className="text-2xl font-bold text-foreground mb-2">Loading...</h1>
+            <p className="text-muted-foreground">Preparing your scholarship application form...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <ScholarshipSignupContent />
+    </Suspense>
   )
 }
