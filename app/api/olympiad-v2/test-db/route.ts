@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verifyAdminToken } from "@/lib/admin-auth"
-import { initializeAllTables, checkDatabaseStatus } from "@/lib/olympiad-v2/database"
+import { initializeOlympiadDatabase, checkDatabaseStatus } from "@/lib/olympiad-v2/database"
 
 // GET database status
 export async function GET(request: Request) {
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
     
     // Initialize all tables
-    const result = await initializeAllTables()
+    const result = await initializeOlympiadDatabase()
     
     return NextResponse.json({
       success: result.success,

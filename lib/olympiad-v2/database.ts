@@ -307,7 +307,7 @@ export async function ensureExamAnswersTable(): Promise<void> {
   await ensureTable('exam_answers', `
     CREATE TABLE exam_answers (
       id SERIAL PRIMARY KEY,
-      attempt_id INT NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+      attempt_id INT NOT NULL REFERENCES exam_attempts_v2(id) ON DELETE CASCADE,
       question_id INT NOT NULL REFERENCES question_bank(id) ON DELETE CASCADE,
       answer_text TEXT,
       answer_file_url TEXT,
@@ -542,6 +542,7 @@ export async function checkDatabaseStatus(): Promise<{ initialized: boolean; tab
       'question_bank',
       'exam_configs', 
       'exam_attempts_v2',
+      'exam_answers',
       'manual_marks',
       'rankings'
     ]
@@ -609,6 +610,9 @@ export async function ensureRankingsTable(): Promise<void> {
     )
   `)
 }
+
+// Alias initializeAllTables as initializeOlympiadDatabase for backward compatibility
+export const initializeOlympiadDatabase = initializeAllTables;
 
 // Export sql for use in other modules
 export { sql }

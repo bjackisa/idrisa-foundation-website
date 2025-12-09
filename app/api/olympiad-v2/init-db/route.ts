@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
-import { initializeAllTables, checkDatabaseStatus } from "@/lib/olympiad-v2/database"
+import { initializeOlympiadDatabase, checkDatabaseStatus } from "@/lib/olympiad-v2/database"
 
 export async function POST() {
   try {
-    const result = await initializeAllTables()
+    const result = await initializeOlympiadDatabase()
     
     return NextResponse.json({
       success: result.success,
