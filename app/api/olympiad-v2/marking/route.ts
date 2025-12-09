@@ -23,8 +23,9 @@ export async function GET(request: Request) {
     const stageId = searchParams.get("stageId")
 
     const tasks = await getPendingMarkingTasks(
-      editionId ? parseInt(editionId) : undefined,
-      stageId ? parseInt(stageId) : undefined
+      editionId || undefined,
+      searchParams.get("subject") || undefined,
+      searchParams.get("educationLevel") || undefined
     )
 
     return NextResponse.json({ tasks })
@@ -50,22 +51,23 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { attempt_id, question_id, marks_obtained, max_marks, feedback } = body
+    const { exam_attempt_id, question_id, marks_awarded, feedback } = body
 
-    if (!attempt_id || !question_id || marks_obtained === undefined || !max_marks) {
+    if (!exam_attempt_id || !question_id || marks_awarded === undefined) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
       )
     }
 
-    await submitManualMark(
-      attempt_id,
-      question_id,
-      marks_obtained,
-      max_marks,
+    const markResult = await submitManualMark(
       admin.id,
-      feedback
+      {
+        exam_attempt_id,
+        question_id,
+        marks_awarded,
+        feedback
+      }
     )
 
     return NextResponse.json({ success: true })

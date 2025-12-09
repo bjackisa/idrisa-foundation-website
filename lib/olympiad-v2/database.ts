@@ -2,405 +2,551 @@ import { neon } from '@neondatabase/serverless'
 
 const sql = neon(process.env.DATABASE_URL!)
 
-// Database schema for the complete olympiad system
-const OLYMPIAD_SCHEMA = `
--- ============================================================================
--- OLYMPIAD EDITIONS
--- ============================================================================
-CREATE TYPE edition_status AS ENUM ('DRAFT', 'OPEN', 'ACTIVE', 'COMPLETED', 'CANCELLED');
+// ============================================================================
+// SELF-HEALING DATABASE MODULE
+// Each function ensures its required tables/columns exist before operating
+// ============================================================================
 
-CREATE TABLE IF NOT EXISTS olympiad_editions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  year INT NOT NULL,
-  enrollment_start TIMESTAMP WITH TIME ZONE NOT NULL,
-  enrollment_end TIMESTAMP WITH TIME ZONE NOT NULL,
-  status edition_status NOT NULL DEFAULT 'DRAFT',
-  
-  -- Active levels (JSON array of enabled levels)
-  active_levels JSONB NOT NULL DEFAULT '["Primary", "O-Level", "A-Level"]',
-  
-  -- Active subjects per level (JSON object)
-  active_subjects JSONB NOT NULL DEFAULT '{
-    "Primary": ["Math", "Science", "ICT"],
-    "O-Level": ["Math", "Biology", "Chemistry", "Physics", "ICT", "Agriculture"],
-    "A-Level": ["Math", "Biology", "Chemistry", "Physics", "ICT", "Agriculture"]
-  }',
-  
-  -- Age rules (can override defaults)
-  age_rules JSONB NOT NULL DEFAULT '{
-    "Primary": {"min": 9, "max": 15},
-    "O-Level": {"min": 11, "max": 18},
-    "A-Level": {"min": 15, "max": 21}
-  }',
-  
-  -- Global rules
-  max_subjects_per_participant INT DEFAULT 3,
-  reference_date DATE,  -- For age calculation
-  
-  created_by_admin_id UUID NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- ============================================================================
--- PARTICIPANTS
--- ============================================================================
-CREATE TYPE education_level AS ENUM ('Primary', 'O-Level', 'A-Level');
-
-CREATE TABLE IF NOT EXISTS olympiad_participants (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  edition_id UUID NOT NULL REFERENCES olympiad_editions(id) ON DELETE CASCADE,
-  
-  -- Personal info
-  first_name TEXT NOT NULL,
-  last_name TEXT NOT NULL,
-  email TEXT NOT NULL,
-  phone TEXT,
-  date_of_birth DATE,
-  education_level education_level NOT NULL,
-  school_name TEXT,
-  district TEXT,
-  
-  -- Enrollment details
-  enrollment_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  parent_consent BOOLEAN DEFAULT FALSE,  -- For minors
-  consent_given_by TEXT,  -- Parent/guardian name
-  consent_contact TEXT,  -- Parent/guardian contact
-  
-  -- Status
-  is_active BOOLEAN DEFAULT TRUE,
-  current_stage TEXT DEFAULT 'Beginner',  -- Current stage in progression
-  
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  
-  UNIQUE(user_id, edition_id)
-);
-
--- ============================================================================
--- QUESTION BANK
--- ============================================================================
-CREATE TYPE question_type AS ENUM ('multiple_choice', 'true_false', 'short_answer', 'essay');
-CREATE TYPE difficulty_level AS ENUM ('easy', 'medium', 'hard');
-
-CREATE TABLE IF NOT EXISTS question_bank (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  question_text TEXT NOT NULL,
-  question_type question_type NOT NULL,
-  difficulty difficulty_level NOT NULL,
-  subject TEXT NOT NULL,
-  education_level education_level NOT NULL,
-  stage TEXT NOT NULL,  -- Beginner, Theory, Practical, Final
-  
-  -- Multiple choice options (JSON)
-  options JSONB,  -- Array of options for multiple choice
-  
-  -- Correct answer(s)
-  correct_answer TEXT NOT NULL,
-  explanation TEXT,
-  
-  -- Metadata
-  points_value DECIMAL(5,2) DEFAULT 1.00,
-  time_limit_seconds INT DEFAULT 60,  -- Suggested time limit
-  
-  -- Status
-  is_active BOOLEAN DEFAULT TRUE,
-  created_by_admin_id UUID NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- ============================================================================
--- EXAM CONFIGURATIONS
--- ============================================================================
-CREATE TYPE exam_status AS ENUM ('draft', 'ready', 'active', 'completed', 'cancelled');
-
-CREATE TABLE IF NOT EXISTS exam_configurations (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  edition_id UUID NOT NULL REFERENCES olympiad_editions(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  
-  -- Exam details
-  education_level education_level NOT NULL,
-  subject TEXT NOT NULL,
-  stage TEXT NOT NULL,  -- Beginner, Theory, Practical, Final
-  
-  -- Question selection
-  total_questions INT NOT NULL,
-  questions_per_difficulty JSONB NOT NULL DEFAULT '{
-    "easy": 0,
-    "medium": 0,
-    "hard": 0
-  }',
-  randomize_questions BOOLEAN DEFAULT TRUE,
-  randomize_options BOOLEAN DEFAULT TRUE,
-  
-  -- Timing
-  duration_minutes INT NOT NULL,
-  start_time TIMESTAMP WITH TIME ZONE,
-  end_time TIMESTAMP WITH TIME ZONE,
-  
-  -- Access control
-  requires_supervision BOOLEAN DEFAULT FALSE,
-  max_attempts INT DEFAULT 1,
-  
-  -- Status
-  status exam_status DEFAULT 'draft',
-  
-  created_by_admin_id UUID NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- ============================================================================
--- EXAM SESSIONS
--- ============================================================================
-CREATE TYPE session_status AS ENUM ('created', 'started', 'in_progress', 'completed', 'abandoned', 'expired');
-
-CREATE TABLE IF NOT EXISTS exam_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  exam_config_id UUID NOT NULL REFERENCES exam_configurations(id) ON DELETE CASCADE,
-  participant_id UUID NOT NULL REFERENCES olympiad_participants(id) ON DELETE CASCADE,
-  
-  -- Session details
-  session_code TEXT UNIQUE,  -- For joining exams
-  started_at TIMESTAMP WITH TIME ZONE,
-  completed_at TIMESTAMP WITH TIME ZONE,
-  last_activity_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  
-  -- Timing
-  duration_minutes INT NOT NULL,
-  time_remaining_seconds INT,
-  is_paused BOOLEAN DEFAULT FALSE,
-  
-  -- Status
-  status session_status DEFAULT 'created',
-  
-  -- Results
-  total_score DECIMAL(8,2) DEFAULT 0,
-  max_score DECIMAL(8,2) DEFAULT 0,
-  percentage_score DECIMAL(5,2) DEFAULT 0,
-  
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- ============================================================================
--- EXAM ANSWERS
--- ============================================================================
-CREATE TABLE IF NOT EXISTS exam_answers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID NOT NULL REFERENCES exam_sessions(id) ON DELETE CASCADE,
-  question_id UUID NOT NULL REFERENCES question_bank(id) ON DELETE CASCADE,
-  
-  -- Answer details
-  selected_answer TEXT,
-  is_correct BOOLEAN,
-  points_earned DECIMAL(5,2) DEFAULT 0,
-  max_points DECIMAL(5,2) DEFAULT 1.00,
-  
-  -- Timing
-  time_taken_seconds INT,
-  answered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  
-  -- Flag for review
-  is_flagged_for_review BOOLEAN DEFAULT FALSE,
-  
-  UNIQUE(session_id, question_id)
-);
-
--- ============================================================================
--- MARKING QUEUE
--- ============================================================================
-CREATE TYPE marking_status AS ENUM ('pending', 'in_progress', 'completed', 'requires_review');
-
-CREATE TABLE IF NOT EXISTS marking_queue (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id UUID NOT NULL REFERENCES exam_sessions(id) ON DELETE CASCADE,
-  question_id UUID NOT NULL REFERENCES question_bank(id) ON DELETE CASCADE,
-  
-  -- Marking details
-  answer_id UUID NOT NULL REFERENCES exam_answers(id) ON DELETE CASCADE,
-  assigned_marker_id UUID,  -- Admin ID
-  marked_by_admin_id UUID,
-  
-  -- Status
-  status marking_status DEFAULT 'pending',
-  
-  -- Scores
-  auto_score DECIMAL(5,2),
-  manual_score DECIMAL(5,2),
-  final_score DECIMAL(5,2),
-  
-  -- Feedback
-  marker_feedback TEXT,
-  moderator_feedback TEXT,
-  
-  -- Timestamps
-  assigned_at TIMESTAMP WITH TIME ZONE,
-  marking_started_at TIMESTAMP WITH TIME ZONE,
-  marking_completed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  
-  UNIQUE(session_id, question_id)
-);
-
--- ============================================================================
--- PROGRESSION & RANKINGS
--- ============================================================================
-CREATE TABLE IF NOT EXISTS stage_progression (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  participant_id UUID NOT NULL REFERENCES olympiad_participants(id) ON DELETE CASCADE,
-  edition_id UUID NOT NULL REFERENCES olympiad_editions(id) ON DELETE CASCADE,
-  
-  -- Stage details
-  current_stage TEXT NOT NULL,
-  stage_completed BOOLEAN DEFAULT FALSE,
-  completion_date TIMESTAMP WITH TIME ZONE,
-  
-  -- Scores for this stage
-  stage_score DECIMAL(8,2) DEFAULT 0,
-  stage_max_score DECIMAL(8,2) DEFAULT 0,
-  stage_percentage DECIMAL(5,2) DEFAULT 0,
-  
-  -- Ranking
-  stage_rank INT,
-  total_participants INT,
-  
-  -- Progression decision
-  can_progress BOOLEAN DEFAULT FALSE,
-  progression_reason TEXT,
-  
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  
-  UNIQUE(participant_id, edition_id, current_stage)
-);
-
--- ============================================================================
--- FINAL VENUES
--- ============================================================================
-CREATE TABLE IF NOT EXISTS final_venues (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  edition_id UUID NOT NULL REFERENCES olympiad_editions(id) ON DELETE CASCADE,
-  
-  -- Venue details
-  venue_name TEXT NOT NULL,
-  venue_address TEXT,
-  venue_map_link TEXT,
-  event_date TIMESTAMP WITH TIME ZONE NOT NULL,
-  capacity INT,
-  
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  
-  UNIQUE(edition_id, education_level, subject)
-);
-
--- ============================================================================
--- FINAL RESULTS
--- ============================================================================
-CREATE TABLE IF NOT EXISTS final_results (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  participant_id UUID NOT NULL REFERENCES olympiad_participants(id) ON DELETE CASCADE,
-  final_venue_id UUID NOT NULL REFERENCES final_venues(id) ON DELETE CASCADE,
-  subject TEXT NOT NULL,
-  
-  -- Attendance
-  attendance_status TEXT,  -- PRESENT, ABSENT
-  
-  -- Results
-  final_score DECIMAL(8, 2),
-  final_rank INT,
-  
-  -- Awards
-  award_category TEXT,  -- GOLD, SILVER, BRONZE, MERIT
-  certificate_url TEXT,
-  
-  entered_by_admin_id UUID,
-  entered_at TIMESTAMP WITH TIME ZONE,
-  
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  
-  UNIQUE(participant_id, final_venue_id, subject)
-);
-
--- ============================================================================
--- INDEXES
--- ============================================================================
-CREATE INDEX IF NOT EXISTS idx_olympiad_editions_status ON olympiad_editions(status);
-CREATE INDEX IF NOT EXISTS idx_participants_edition ON olympiad_participants(edition_id);
-CREATE INDEX IF NOT EXISTS idx_participants_user ON olympiad_participants(user_id);
-CREATE INDEX IF NOT EXISTS idx_questions_subject_level ON question_bank(subject, education_level);
-CREATE INDEX IF NOT EXISTS idx_questions_stage ON question_bank(stage);
-CREATE INDEX IF NOT EXISTS idx_exam_configs_edition ON exam_configurations(edition_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_participant ON exam_sessions(participant_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_config ON exam_sessions(exam_config_id);
-CREATE INDEX IF NOT EXISTS idx_answers_session ON exam_answers(session_id);
-CREATE INDEX IF NOT EXISTS idx_marking_queue_status ON marking_queue(status);
-CREATE INDEX IF NOT EXISTS idx_progression_participant ON stage_progression(participant_id);
-CREATE INDEX IF NOT EXISTS idx_final_results_participant ON final_results(participant_id);
-`
-
-export async function initializeOlympiadDatabase(): Promise<{ success: boolean; message: string }> {
+/**
+ * Ensure a table exists, create if not
+ */
+async function ensureTable(tableName: string, createSQL: string): Promise<void> {
   try {
-    // Execute the schema creation
-    await sql`${OLYMPIAD_SCHEMA}`
-    
-    // Check if tables were created successfully
+    const exists = await sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = ${tableName}
+      ) as exists
+    `
+    if (!exists[0]?.exists) {
+      await sql.query(createSQL)
+      console.log(`Created table: ${tableName}`)
+    }
+  } catch (error) {
+    console.error(`Error ensuring table ${tableName}:`, error)
+    throw error
+  }
+}
+
+/**
+ * Ensure a column exists in a table, add if not
+ */
+async function ensureColumn(tableName: string, columnName: string, columnDef: string): Promise<void> {
+  try {
+    const exists = await sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        AND table_name = ${tableName}
+        AND column_name = ${columnName}
+      ) as exists
+    `
+    if (!exists[0]?.exists) {
+      await sql.query(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`)
+      console.log(`Added column ${columnName} to ${tableName}`)
+    }
+  } catch (error) {
+    console.error(`Error ensuring column ${columnName} in ${tableName}:`, error)
+    // Don't throw - column might already exist with different case
+  }
+}
+
+// ============================================================================
+// OLYMPIAD EDITIONS TABLE
+// ============================================================================
+export async function ensureOlympiadEditionsTable(): Promise<void> {
+  await ensureTable('olympiad_editions', `
+    CREATE TABLE olympiad_editions (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      year INT NOT NULL,
+      theme TEXT,
+      description TEXT,
+      enrollment_start TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      enrollment_end TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW() + INTERVAL '30 days',
+      status TEXT NOT NULL DEFAULT 'DRAFT',
+      active_levels JSONB NOT NULL DEFAULT '["Primary", "O-Level", "A-Level"]',
+      active_subjects JSONB NOT NULL DEFAULT '{"Primary": ["Math", "Science", "ICT"], "O-Level": ["Math", "Biology", "Chemistry", "Physics", "ICT", "Agriculture"], "A-Level": ["Math", "Biology", "Chemistry", "Physics", "ICT", "Agriculture"]}',
+      age_rules JSONB NOT NULL DEFAULT '{"Primary": {"min": 9, "max": 15}, "O-Level": {"min": 11, "max": 18}, "A-Level": {"min": 15, "max": 21}}',
+      max_subjects_per_participant INT DEFAULT 3,
+      reference_date DATE,
+      created_by_admin_id TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `)
+  // Ensure all columns exist (for migrations)
+  await ensureColumn('olympiad_editions', 'theme', 'TEXT')
+  await ensureColumn('olympiad_editions', 'description', 'TEXT')
+  await ensureColumn('olympiad_editions', 'active_levels', "JSONB DEFAULT '[]'")
+  await ensureColumn('olympiad_editions', 'active_subjects', "JSONB DEFAULT '{}'")
+  await ensureColumn('olympiad_editions', 'age_rules', "JSONB DEFAULT '{}'")
+}
+
+// ============================================================================
+// EDITION STAGES TABLE (for stage configuration per edition)
+// ============================================================================
+export async function ensureEditionStagesTable(): Promise<void> {
+  await ensureOlympiadEditionsTable()
+  await ensureTable('edition_stages', `
+    CREATE TABLE edition_stages (
+      id SERIAL PRIMARY KEY,
+      edition_id INT NOT NULL REFERENCES olympiad_editions(id) ON DELETE CASCADE,
+      stage_number INT NOT NULL,
+      stage_name TEXT NOT NULL,
+      stage_type TEXT NOT NULL DEFAULT 'ONLINE_QUIZ',
+      start_date TIMESTAMP WITH TIME ZONE,
+      end_date TIMESTAMP WITH TIME ZONE,
+      pass_percentage DECIMAL(5,2) DEFAULT 70,
+      pass_count INT,
+      education_level TEXT,
+      subject TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE(edition_id, stage_number, education_level, subject)
+    )
+  `)
+}
+
+// ============================================================================
+// QUESTION BANK TABLE
+// ============================================================================
+export async function ensureQuestionBankTable(): Promise<void> {
+  await ensureTable('question_bank', `
+    CREATE TABLE question_bank (
+      id SERIAL PRIMARY KEY,
+      question_text TEXT NOT NULL,
+      question_type TEXT NOT NULL DEFAULT 'MCQ',
+      question_format TEXT NOT NULL DEFAULT 'Quiz',
+      difficulty TEXT NOT NULL DEFAULT 'medium',
+      subject TEXT NOT NULL,
+      education_level TEXT NOT NULL DEFAULT 'Primary',
+      stage TEXT NOT NULL DEFAULT 'Beginner',
+      options JSONB,
+      correct_answer TEXT,
+      correct_answers JSONB,
+      marking_guide TEXT,
+      explanation TEXT,
+      marks DECIMAL(5,2) DEFAULT 1,
+      time_limit_seconds INT DEFAULT 60,
+      file_types JSONB,
+      max_file_size INT,
+      word_limit INT,
+      sub_questions JSONB,
+      topic TEXT,
+      subtopic TEXT,
+      tags JSONB,
+      is_active BOOLEAN DEFAULT TRUE,
+      created_by_admin_id TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `)
+  // Ensure all columns exist
+  await ensureColumn('question_bank', 'question_format', "TEXT DEFAULT 'Quiz'")
+  await ensureColumn('question_bank', 'marking_guide', 'TEXT')
+  await ensureColumn('question_bank', 'correct_answers', 'JSONB')
+  await ensureColumn('question_bank', 'file_types', 'JSONB')
+  await ensureColumn('question_bank', 'max_file_size', 'INT')
+  await ensureColumn('question_bank', 'word_limit', 'INT')
+  await ensureColumn('question_bank', 'sub_questions', 'JSONB')
+  await ensureColumn('question_bank', 'topic', 'TEXT')
+  await ensureColumn('question_bank', 'subtopic', 'TEXT')
+  await ensureColumn('question_bank', 'tags', 'JSONB')
+}
+
+// ============================================================================
+// PARTICIPANTS TABLE
+// ============================================================================
+export async function ensureParticipantsTable(): Promise<void> {
+  await ensureOlympiadEditionsTable()
+  await ensureTable('olympiad_participants', `
+    CREATE TABLE olympiad_participants (
+      id SERIAL PRIMARY KEY,
+      edition_id INT NOT NULL REFERENCES olympiad_editions(id) ON DELETE CASCADE,
+      participant_type TEXT NOT NULL DEFAULT 'SELF',
+      user_id TEXT,
+      guardian_id TEXT,
+      minor_profile_id INT,
+      first_name TEXT NOT NULL,
+      last_name TEXT NOT NULL,
+      email TEXT,
+      phone TEXT,
+      date_of_birth DATE,
+      education_level TEXT NOT NULL,
+      school_name TEXT,
+      district TEXT,
+      subjects JSONB DEFAULT '[]',
+      current_stage TEXT DEFAULT 'Beginner',
+      status TEXT DEFAULT 'ACTIVE',
+      parent_consent BOOLEAN DEFAULT FALSE,
+      consent_given_by TEXT,
+      consent_contact TEXT,
+      enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `)
+  await ensureColumn('olympiad_participants', 'participant_type', "TEXT DEFAULT 'SELF'")
+  await ensureColumn('olympiad_participants', 'guardian_id', 'TEXT')
+  await ensureColumn('olympiad_participants', 'minor_profile_id', 'INT')
+  await ensureColumn('olympiad_participants', 'subjects', "JSONB DEFAULT '[]'")
+  await ensureColumn('olympiad_participants', 'status', "TEXT DEFAULT 'ACTIVE'")
+}
+
+// ============================================================================
+// PARTICIPANT SUBJECTS TABLE
+// ============================================================================
+export async function ensureParticipantSubjectsTable(): Promise<void> {
+  await ensureParticipantsTable()
+  await ensureTable('participant_subjects', `
+    CREATE TABLE participant_subjects (
+      id SERIAL PRIMARY KEY,
+      participant_id INT NOT NULL REFERENCES olympiad_participants(id) ON DELETE CASCADE,
+      subject TEXT NOT NULL,
+      current_stage TEXT DEFAULT 'Beginner',
+      stage_status TEXT DEFAULT 'PENDING',
+      enrolled_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE(participant_id, subject)
+    )
+  `)
+}
+
+// ============================================================================
+// MINOR PROFILES TABLE
+// ============================================================================
+export async function ensureMinorProfilesTable(): Promise<void> {
+  await ensureTable('minor_profiles', `
+    CREATE TABLE minor_profiles (
+      id SERIAL PRIMARY KEY,
+      guardian_id TEXT NOT NULL,
+      full_name TEXT NOT NULL,
+      date_of_birth DATE NOT NULL,
+      gender TEXT,
+      school_name TEXT,
+      class_grade TEXT,
+      district TEXT,
+      national_id TEXT,
+      student_number TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `)
+}
+
+// ============================================================================
+// EXAM CONFIGURATIONS TABLE
+// ============================================================================
+export async function ensureExamConfigsTable(): Promise<void> {
+  await ensureOlympiadEditionsTable()
+  await ensureQuestionBankTable()
+  await ensureTable('exam_configs', `
+    CREATE TABLE exam_configs (
+      id SERIAL PRIMARY KEY,
+      edition_id INT NOT NULL REFERENCES olympiad_editions(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      description TEXT,
+      education_level TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      stage TEXT NOT NULL DEFAULT 'Beginner',
+      question_ids JSONB DEFAULT '[]',
+      total_questions INT DEFAULT 0,
+      duration_minutes INT NOT NULL DEFAULT 60,
+      start_datetime TIMESTAMP WITH TIME ZONE,
+      end_datetime TIMESTAMP WITH TIME ZONE,
+      randomize_questions BOOLEAN DEFAULT TRUE,
+      randomize_options BOOLEAN DEFAULT TRUE,
+      show_score_immediately BOOLEAN DEFAULT TRUE,
+      pass_percentage DECIMAL(5,2) DEFAULT 70,
+      max_attempts INT DEFAULT 1,
+      status TEXT DEFAULT 'DRAFT',
+      created_by_admin_id TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `)
+}
+
+// PARTICIPANT SUBJECTS TABLE is already defined above
+
+// ============================================================================
+// EXAM ATTEMPTS TABLE
+// ============================================================================
+export async function ensureExamAttemptsTable(): Promise<void> {
+  await ensureParticipantsTable()
+  await ensureExamConfigsTable()
+  await ensureTable('exam_attempts_v2', `
+    CREATE TABLE exam_attempts_v2 (
+      id SERIAL PRIMARY KEY,
+      participant_id INT NOT NULL REFERENCES olympiad_participants(id) ON DELETE CASCADE,
+      exam_config_id INT NOT NULL REFERENCES exam_configs(id) ON DELETE CASCADE,
+      started_at TIMESTAMP DEFAULT NOW(),
+      submitted_at TIMESTAMP,
+      time_taken_minutes INT,
+      is_submitted BOOLEAN DEFAULT FALSE,
+      auto_submitted BOOLEAN DEFAULT FALSE,
+      answers JSONB,
+      auto_marks DECIMAL(5,2) DEFAULT 0,
+      manual_marks DECIMAL(5,2) DEFAULT 0,
+      total_marks DECIMAL(5,2) DEFAULT 0,
+      max_marks INT,
+      percentage DECIMAL(5,2) DEFAULT 0,
+      status VARCHAR(20) DEFAULT 'NOT_STARTED',
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `)
+}
+
+// ============================================================================
+// EXAM ANSWERS TABLE (individual answers for marking)
+// ============================================================================
+export async function ensureExamAnswersTable(): Promise<void> {
+  await ensureExamAttemptsTable()
+  await ensureQuestionBankTable()
+  await ensureTable('exam_answers', `
+    CREATE TABLE exam_answers (
+      id SERIAL PRIMARY KEY,
+      attempt_id INT NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
+      question_id INT NOT NULL REFERENCES question_bank(id) ON DELETE CASCADE,
+      answer_text TEXT,
+      answer_file_url TEXT,
+      selected_option INT,
+      selected_options JSONB,
+      is_correct BOOLEAN,
+      auto_score DECIMAL(5,2),
+      manual_score DECIMAL(5,2),
+      final_score DECIMAL(5,2),
+      max_score DECIMAL(5,2) DEFAULT 1,
+      marking_status TEXT DEFAULT 'PENDING',
+      marker_feedback TEXT,
+      marked_by_admin_id TEXT,
+      marked_at TIMESTAMP WITH TIME ZONE,
+      answered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      time_taken_seconds INT,
+      UNIQUE(attempt_id, question_id)
+    )
+  `)
+}
+
+// ============================================================================
+// MARKING QUEUE TABLE
+// ============================================================================
+export async function ensureMarkingQueueTable(): Promise<void> {
+  await ensureExamAnswersTable()
+  await ensureTable('marking_queue', `
+    CREATE TABLE marking_queue (
+      id SERIAL PRIMARY KEY,
+      answer_id INT NOT NULL REFERENCES exam_answers(id) ON DELETE CASCADE,
+      attempt_id INT NOT NULL,
+      question_id INT NOT NULL,
+      participant_id INT NOT NULL,
+      edition_id INT NOT NULL,
+      subject TEXT NOT NULL,
+      education_level TEXT NOT NULL,
+      stage TEXT NOT NULL,
+      question_type TEXT NOT NULL,
+      assigned_marker_id TEXT,
+      status TEXT DEFAULT 'PENDING',
+      priority INT DEFAULT 0,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `)
+}
+
+// ============================================================================
+// STAGE RESULTS TABLE
+// ============================================================================
+export async function ensureStageResultsTable(): Promise<void> {
+  await ensureParticipantsTable()
+  await ensureTable('stage_results', `
+    CREATE TABLE stage_results (
+      id SERIAL PRIMARY KEY,
+      participant_id INT NOT NULL REFERENCES olympiad_participants(id) ON DELETE CASCADE,
+      edition_id INT NOT NULL,
+      subject TEXT NOT NULL,
+      stage TEXT NOT NULL,
+      attempt_id INT,
+      total_marks DECIMAL(8,2) DEFAULT 0,
+      marks_obtained DECIMAL(8,2) DEFAULT 0,
+      percentage DECIMAL(5,2) DEFAULT 0,
+      rank INT,
+      total_participants INT,
+      is_qualified BOOLEAN DEFAULT FALSE,
+      qualification_reason TEXT,
+      computed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE(participant_id, edition_id, subject, stage)
+    )
+  `)
+}
+
+// ============================================================================
+// FINAL VENUES TABLE
+// ============================================================================
+export async function ensureFinalVenuesTable(): Promise<void> {
+  await ensureOlympiadEditionsTable()
+  await ensureTable('final_venues', `
+    CREATE TABLE final_venues (
+      id SERIAL PRIMARY KEY,
+      edition_id INT NOT NULL REFERENCES olympiad_editions(id) ON DELETE CASCADE,
+      education_level TEXT,
+      subject TEXT,
+      venue_name TEXT NOT NULL,
+      venue_address TEXT,
+      venue_map_link TEXT,
+      district TEXT,
+      event_date DATE NOT NULL,
+      event_time TIME,
+      capacity INT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `)
+}
+
+// ============================================================================
+// FINAL RESULTS TABLE
+// ============================================================================
+export async function ensureFinalResultsTable(): Promise<void> {
+  await ensureParticipantsTable()
+  await ensureFinalVenuesTable()
+  await ensureTable('final_results', `
+    CREATE TABLE final_results (
+      id SERIAL PRIMARY KEY,
+      participant_id INT NOT NULL REFERENCES olympiad_participants(id) ON DELETE CASCADE,
+      venue_id INT REFERENCES final_venues(id) ON DELETE SET NULL,
+      edition_id INT NOT NULL,
+      subject TEXT NOT NULL,
+      attendance_status TEXT,
+      final_score DECIMAL(8,2),
+      final_rank INT,
+      award_category TEXT,
+      certificate_url TEXT,
+      remarks TEXT,
+      entered_by_admin_id TEXT,
+      entered_at TIMESTAMP WITH TIME ZONE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE(participant_id, edition_id, subject)
+    )
+  `)
+}
+
+// ============================================================================
+// NOTIFICATIONS TABLE
+// ============================================================================
+export async function ensureNotificationsTable(): Promise<void> {
+  await ensureTable('olympiad_notifications', `
+    CREATE TABLE olympiad_notifications (
+      id SERIAL PRIMARY KEY,
+      user_id TEXT,
+      participant_id INT,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      data JSONB,
+      is_read BOOLEAN DEFAULT FALSE,
+      sent_via_email BOOLEAN DEFAULT FALSE,
+      sent_via_sms BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `)
+}
+
+// ============================================================================
+// AUDIT LOG TABLE
+// ============================================================================
+export async function ensureAuditLogTable(): Promise<void> {
+  await ensureTable('audit_log', `
+    CREATE TABLE audit_log (
+      id SERIAL PRIMARY KEY,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      changes JSONB,
+      performed_by_user_id TEXT,
+      performed_by_admin_id TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `)
+}
+
+// ============================================================================
+// INITIALIZE ALL TABLES
+// ============================================================================
+export async function initializeAllTables(): Promise<{ success: boolean; message: string; tables: string[] }> {
+  try {
+    await ensureOlympiadEditionsTable()
+    await ensureEditionStagesTable()
+    await ensureQuestionBankTable()
+    await ensureMinorProfilesTable()
+    await ensureParticipantsTable()
+    await ensureParticipantSubjectsTable()
+    await ensureExamConfigsTable()
+    await ensureExamAttemptsTable()
+    await ensureExamAnswersTable()
+    await ensureManualMarksTable()
+    await ensureRankingsTable()
+    await ensureMarkingQueueTable()
+    await ensureStageResultsTable()
+    await ensureFinalVenuesTable()
+    await ensureFinalResultsTable()
+    await ensureNotificationsTable()
+    await ensureAuditLogTable()
+
+    // Get list of created tables
     const tables = await sql`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
-      AND table_name LIKE 'olympiad_%' OR table_name = 'question_bank' 
-      OR table_name = 'exam_configurations' OR table_name = 'exam_sessions'
-      OR table_name = 'exam_answers' OR table_name = 'marking_queue'
-      OR table_name = 'stage_progression' OR table_name = 'final_venues'
-      OR table_name = 'final_results'
       ORDER BY table_name
     `
-    
+    const tableNames = tables.map(t => t.table_name as string)
+
     return {
       success: true,
-      message: `Database initialized successfully. Created ${tables.length} tables.`
+      message: 'All Olympiad tables initialized successfully',
+      tables: tableNames
     }
   } catch (error) {
-    console.error('Database initialization failed:', error)
+    console.error('Failed to initialize tables:', error)
     return {
       success: false,
-      message: `Database initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      message: error instanceof Error ? error.message : 'Unknown error',
+      tables: []
     }
   }
 }
 
+// ============================================================================
+// DATABASE STATUS CHECK
+// ============================================================================
 export async function checkDatabaseStatus(): Promise<{ initialized: boolean; tables: string[] }> {
   try {
     const tables = await sql`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
-      AND (table_name LIKE 'olympiad_%' OR table_name = 'question_bank' 
-           OR table_name = 'exam_configurations' OR table_name = 'exam_sessions'
-           OR table_name = 'exam_answers' OR table_name = 'marking_queue'
-           OR table_name = 'stage_progression' OR table_name = 'final_venues'
-           OR table_name = 'final_results')
       ORDER BY table_name
     `
     
-    const tableNames = tables.map(t => t.table_name)
-    const expectedTables = [
-      'olympiad_editions', 'olympiad_participants', 'question_bank',
-      'exam_configurations', 'exam_sessions', 'exam_answers',
-      'marking_queue', 'stage_progression', 'final_venues', 'final_results'
+    const tableNames = tables.map(t => t.table_name as string)
+    const requiredTables = [
+      'olympiad_editions', 
+      'edition_stages',
+      'olympiad_participants', 
+      'participant_subjects',
+      'question_bank',
+      'exam_configs', 
+      'exam_attempts_v2',
+      'manual_marks',
+      'rankings'
     ]
     
-    const initialized = expectedTables.every(table => tableNames.includes(table))
+    const initialized = requiredTables.every(table => tableNames.includes(table))
     
     return {
       initialized,
@@ -414,3 +560,55 @@ export async function checkDatabaseStatus(): Promise<{ initialized: boolean; tab
     }
   }
 }
+
+/**
+ * Ensure manual_marks table exists
+ */
+export async function ensureManualMarksTable(): Promise<void> {
+  await ensureExamAttemptsTable()
+  await ensureQuestionBankTable()
+  await ensureTable('manual_marks', `
+    CREATE TABLE manual_marks (
+      id SERIAL PRIMARY KEY,
+      exam_attempt_id INT NOT NULL REFERENCES exam_attempts_v2(id) ON DELETE CASCADE,
+      question_id INT NOT NULL REFERENCES question_bank(id) ON DELETE CASCADE,
+      marks_awarded DECIMAL(5,2) NOT NULL,
+      max_marks INT NOT NULL,
+      feedback TEXT,
+      marked_by_admin_id VARCHAR(255) NOT NULL,
+      marked_at TIMESTAMP DEFAULT NOW(),
+      moderated_by_admin_id VARCHAR(255),
+      moderated_at TIMESTAMP,
+      moderation_notes TEXT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(exam_attempt_id, question_id)
+    )
+  `)
+}
+
+/**
+ * Ensure rankings table exists
+ */
+export async function ensureRankingsTable(): Promise<void> {
+  await ensureOlympiadEditionsTable()
+  await ensureParticipantsTable()
+  await ensureTable('rankings', `
+    CREATE TABLE rankings (
+      id VARCHAR(255) PRIMARY KEY,
+      edition_id VARCHAR(255) NOT NULL,
+      education_level VARCHAR(50) NOT NULL,
+      subject VARCHAR(100) NOT NULL,
+      stage VARCHAR(50) NOT NULL,
+      participant_id VARCHAR(255) NOT NULL,
+      score DECIMAL(10,2) NOT NULL,
+      rank INT NOT NULL,
+      total_participants INT NOT NULL,
+      computed_at TIMESTAMP NOT NULL,
+      UNIQUE(edition_id, education_level, subject, stage, participant_id)
+    )
+  `)
+}
+
+// Export sql for use in other modules
+export { sql }

@@ -3,7 +3,7 @@
  * Functions for grading exams automatically and manually
  */
 
-import { neon } from '@neondatabase/serverless';
+import { sql, ensureExamAttemptsTable, ensureManualMarksTable } from './database';
 import type {
   QuestionV2,
   ExamAttemptV2,
@@ -12,8 +12,6 @@ import type {
   QuestionTypeV2,
 } from './types';
 import { isAutoGradable } from './constants';
-
-const sql = neon(process.env.DATABASE_URL!);
 
 /**
  * Auto-grade a single question
@@ -81,6 +79,8 @@ export function autoGradeQuestion(
 export async function autoGradeExamAttempt(
   attemptId: string
 ): Promise<{ auto_marks: number; max_auto_marks: number; requires_manual: boolean }> {
+  // Ensure tables exist
+  await ensureExamAttemptsTable();
   // Get exam attempt
   const attemptResult = await sql`
     SELECT * FROM exam_attempts_v2
@@ -166,6 +166,8 @@ export async function submitManualMark(
   adminId: string,
   input: MarkingInput
 ): Promise<ManualMark> {
+  // Ensure tables exist
+  await ensureManualMarksTable();
   // Verify question exists and requires manual marking
   const questionResult = await sql`
     SELECT * FROM questions_v2
@@ -228,6 +230,9 @@ export async function submitManualMark(
  * Recalculate total marks for an exam attempt
  */
 export async function recalculateTotalMarks(attemptId: string): Promise<void> {
+  // Ensure tables exist
+  await ensureExamAttemptsTable();
+  await ensureManualMarksTable();
   // Get auto marks
   const attemptResult = await sql`
     SELECT auto_marks FROM exam_attempts_v2
@@ -308,6 +313,8 @@ export async function recalculateTotalMarks(attemptId: string): Promise<void> {
  * Get manual marks for an exam attempt
  */
 export async function getManualMarks(attemptId: string): Promise<ManualMark[]> {
+  // Ensure tables exist
+  await ensureManualMarksTable();
   const result = await sql`
     SELECT * FROM manual_marks
     WHERE exam_attempt_id = ${attemptId}
@@ -325,6 +332,9 @@ export async function getPendingMarkingTasks(
   subject?: string,
   educationLevel?: string
 ): Promise<any[]> {
+  // Ensure tables exist
+  await ensureExamAttemptsTable();
+  await ensureManualMarksTable();
   let query = sql`
     SELECT
       ea.id as attempt_id,
@@ -373,6 +383,8 @@ export async function moderateMark(
   markId: string,
   moderationNotes?: string
 ): Promise<void> {
+  // Ensure tables exist
+  await ensureManualMarksTable();
   await sql`
     UPDATE manual_marks
     SET

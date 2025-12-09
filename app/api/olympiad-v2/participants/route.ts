@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verifyAdminToken } from "@/lib/admin-auth"
-import { getEditionParticipants } from "@/lib/olympiad-v2/enrollment"
+import { getParticipantsByEdition } from "@/lib/olympiad-v2/participants"
 
 // GET all participants for an edition
 export async function GET(request: Request) {
@@ -27,10 +27,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Edition ID required" }, { status: 400 })
     }
 
-    const participants = await getEditionParticipants(
-      parseInt(editionId),
-      educationLevel || undefined,
-      participantType as any
+    const participants = await getParticipantsByEdition(
+      editionId,
+      {
+        education_level: educationLevel || undefined,
+        participant_type: participantType as any
+      }
     )
 
     return NextResponse.json({ participants })

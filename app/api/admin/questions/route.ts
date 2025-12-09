@@ -1,54 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { neon } from '@neondatabase/serverless'
-
-const sql = neon(process.env.DATABASE_URL!)
+import { ensureQuestionBankTable, sql } from '@/lib/olympiad-v2/database'
 
 export async function GET(request: NextRequest) {
   try {
+    // Ensure table exists
+    await ensureQuestionBankTable()
+
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = parseInt(searchParams.get('limit') || '50')
     const subject = searchParams.get('subject')
+    const educationLevel = searchParams.get('educationLevel') || searchParams.get('education_level')
+    const questionType = searchParams.get('questionType') || searchParams.get('question_type')
+    const questionFormat = searchParams.get('questionFormat') || searchParams.get('question_format')
     const difficulty = searchParams.get('difficulty')
-    const question_type = searchParams.get('question_type')
+    const stage = searchParams.get('stage')
     const offset = (page - 1) * limit
 
-    const questions = await sql`
-      SELECT 
-        q.*,
-        COUNT(DISTINCT eq.id) as exam_usage_count
-      FROM question_bank q
-      LEFT JOIN exam_questions eq ON q.id = eq.question_id
-      WHERE 1=1
-      ${subject ? sql`AND q.subject = ${subject}` : sql``}
-      ${difficulty ? sql`AND q.difficulty = ${difficulty}` : sql``}
-      ${question_type ? sql`AND q.question_type = ${question_type}` : sql``}
-      ORDER BY q.created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `
+    // Build dynamic query
+    let whereClause = 'WHERE is_active = true'
+    const params: any[] = []
+    let paramIndex = 1
 
-    const countResult = await sql`
-      SELECT COUNT(*) as total 
-      FROM question_bank q
-      WHERE 1=1
-      ${subject ? sql`AND q.subject = ${subject}` : sql``}
-      ${difficulty ? sql`AND q.difficulty = ${difficulty}` : sql``}
-      ${question_type ? sql`AND q.question_type = ${question_type}` : sql``}
-    `
+    if (subject) {
+      whereClause += ` AND subject = $${paramIndex++}`
+      params.push(subject)
+    }
+    if (educationLevel) {
+      whereClause += ` AND education_level = $${paramIndex++}`
+      params.push(educationLevel)
+    }
+    if (questionType) {
+      whereClause += ` AND question_type = $${paramIndex++}`
+      params.push(questionType)
+    }
+    if (questionFormat) {
+      whereClause += ` AND question_format = $${paramIndex++}`
+      params.push(questionFormat)
+    }
+    if (difficulty) {
+      whereClause += ` AND difficulty = $${paramIndex++}`
+      params.push(difficulty)
+    }
+    if (stage) {
+      whereClause += ` AND stage = $${paramIndex++}`
+      params.push(stage)
+    }
+
+    // Get questions
+    const questions = await sql.query(
+      `SELECT * FROM question_bank ${whereClause} ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex}`,
+      [...params, limit, offset]
+    )
+
+    // Get total count
+    const countResult = await sql.query(
+      `SELECT COUNT(*) as total FROM question_bank ${whereClause}`,
+      params
+    )
 
     return NextResponse.json({
-      questions,
+      questions: questions,
       pagination: {
         page,
         limit,
-        total: parseInt(countResult[0].total),
-        totalPages: Math.ceil(parseInt(countResult[0].total) / limit)
+        total: parseInt(countResult[0]?.total || '0'),
+        totalPages: Math.ceil(parseInt(countResult[0]?.total || '0') / limit)
       }
     })
   } catch (error) {
     console.error('Failed to fetch questions:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch questions' },
+      { error: 'Failed to fetch questions', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
@@ -56,42 +79,96 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Ensure table exists
+    await ensureQuestionBankTable()
+
     const body = await request.json()
     
-    // Handle both camelCase and snake_case field names
     const {
+      // Core fields
       question_text,
+      questionText,
       question_type,
+      questionType,
+      question_format,
+      questionFormat,
       subject,
+      education_level,
+      educationLevel,
+      stage,
       difficulty,
-      correct_answer,
+      hardness,
+      
+      // Quiz/MCQ specific
       options,
+      correct_answer,
+      correctAnswer,
+      correctOption,
+      correct_answers,
+      
+      // Theory/Practical specific
+      marking_guide,
+      markingGuide,
+      word_limit,
+      wordLimit,
+      
+      // File upload specific
+      file_types,
+      fileTypes,
+      max_file_size,
+      maxFileSize,
+      
+      // Structured questions
+      sub_questions,
+      subQuestions,
+      
+      // Metadata
       explanation,
       marks,
       time_limit_seconds,
-      tags,
-      // Support camelCase alternatives
-      questionText,
-      questionType,
-      correctOption
+      topic,
+      subtopic,
+      tags
     } = body
 
-    // Use camelCase fields as fallback if snake_case fields are not provided
+    // Normalize field names (support both camelCase and snake_case)
     const finalQuestionText = question_text || questionText
-    const finalQuestionType = question_type || questionType
-    const finalCorrectAnswer = correct_answer || (Array.isArray(options) ? options[correctOption] : correctOption)
+    const finalQuestionType = question_type || questionType || 'MCQ'
+    const finalQuestionFormat = question_format || questionFormat || 'Quiz'
+    const finalEducationLevel = education_level || educationLevel || 'Primary'
+    const finalStage = stage || 'Beginner'
+    const finalDifficulty = difficulty || hardness || 'medium'
+    
+    // Handle correct answer based on question type
+    let finalCorrectAnswer = correct_answer || correctAnswer
+    let finalCorrectAnswers = correct_answers
+    
+    // For MCQ with correctOption index
+    if (finalQuestionType === 'MCQ' && correctOption !== undefined && Array.isArray(options)) {
+      finalCorrectAnswer = options[correctOption]
+    }
 
     // Validation
-    if (!finalQuestionText || !finalQuestionType || !subject || !difficulty || finalCorrectAnswer === undefined) {
+    if (!finalQuestionText || !subject) {
       return NextResponse.json(
-        { error: 'Missing required fields: question_text, question_type, subject, difficulty, correct_answer' },
+        { error: 'Missing required fields: question_text and subject are required' },
         { status: 400 }
       )
     }
 
-    if (finalQuestionType === 'multiple_choice' && (!options || !Array.isArray(options) || options.length < 2)) {
+    // Quiz questions need correct answer
+    if (finalQuestionFormat === 'Quiz' && !finalCorrectAnswer && !finalCorrectAnswers) {
       return NextResponse.json(
-        { error: 'Multiple choice questions must have at least 2 options' },
+        { error: 'Quiz questions require a correct answer' },
+        { status: 400 }
+      )
+    }
+
+    // MCQ questions need options
+    if ((finalQuestionType === 'MCQ' || finalQuestionType === 'MULTIPLE_SELECT') && 
+        (!options || !Array.isArray(options) || options.length < 2)) {
+      return NextResponse.json(
+        { error: 'MCQ questions must have at least 2 options' },
         { status: 400 }
       )
     }
@@ -100,27 +177,51 @@ export async function POST(request: NextRequest) {
       INSERT INTO question_bank (
         question_text,
         question_type,
+        question_format,
         subject,
+        education_level,
+        stage,
         difficulty,
-        correct_answer,
         options,
+        correct_answer,
+        correct_answers,
+        marking_guide,
+        word_limit,
+        file_types,
+        max_file_size,
+        sub_questions,
         explanation,
         marks,
         time_limit_seconds,
+        topic,
+        subtopic,
         tags,
+        is_active,
         created_by_admin_id
       )
       VALUES (
         ${finalQuestionText},
         ${finalQuestionType},
+        ${finalQuestionFormat},
         ${subject},
-        ${difficulty},
-        ${finalCorrectAnswer},
+        ${finalEducationLevel},
+        ${finalStage},
+        ${finalDifficulty},
         ${options ? JSON.stringify(options) : null},
+        ${finalCorrectAnswer || null},
+        ${finalCorrectAnswers ? JSON.stringify(finalCorrectAnswers) : null},
+        ${marking_guide || markingGuide || null},
+        ${word_limit || wordLimit || null},
+        ${file_types || fileTypes ? JSON.stringify(file_types || fileTypes) : null},
+        ${max_file_size || maxFileSize || null},
+        ${sub_questions || subQuestions ? JSON.stringify(sub_questions || subQuestions) : null},
         ${explanation || null},
         ${marks || 1},
-        ${time_limit_seconds || null},
+        ${time_limit_seconds || 60},
+        ${topic || null},
+        ${subtopic || null},
         ${tags ? JSON.stringify(tags) : null},
+        true,
         'admin-1'
       )
       RETURNING *
@@ -133,7 +234,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Failed to create question:', error)
     return NextResponse.json(
-      { error: 'Failed to create question' },
+      { error: 'Failed to create question', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }

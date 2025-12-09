@@ -7,7 +7,12 @@
 // ENUMS & CONSTANTS
 // ============================================================================
 
-export type ParticipantType = 'SELF' | 'MINOR';
+export enum ParticipantType {
+  SELF = 'SELF',
+  MINOR = 'MINOR'
+}
+
+export type ParticipantTypeString = 'SELF' | 'MINOR';
 export type ParticipantStatus = 'ACTIVE' | 'DISQUALIFIED' | 'WITHDRAWN' | 'COMPLETED';
 export type EditionStatus = 'DRAFT' | 'OPEN' | 'RUNNING' | 'COMPLETED';
 export type StageName = 'Beginner' | 'Theory' | 'Practical' | 'Final';
@@ -140,6 +145,18 @@ export interface EnrollmentInput {
   minor_profile_id?: string;
   education_level: EducationLevel;
   subjects: string[];
+}
+
+export interface CreateParticipantInput {
+  edition_id: string;
+  participant_type: ParticipantType;
+  user_id?: string;
+  guardian_id?: string;
+  minor_id?: string;
+  education_level: EducationLevel;
+  class_level?: string;
+  is_qualified?: boolean;
+  subjects?: string[];
 }
 
 export interface EnrollmentEligibility {

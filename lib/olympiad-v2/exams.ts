@@ -3,7 +3,7 @@
  * Functions for creating exams, managing attempts, and submissions
  */
 
-import { neon } from '@neondatabase/serverless';
+import { sql, ensureExamConfigsTable, ensureExamAttemptsTable } from './database';
 import type {
   ExamConfig,
   ExamAttemptV2,
@@ -13,14 +13,14 @@ import type {
 import { autoGradeExamAttempt } from './marking';
 import { isParticipantEligibleForStage } from './progression';
 
-const sql = neon(process.env.DATABASE_URL!);
-
 /**
  * Create exam configuration
  */
 export async function createExamConfig(
   input: CreateExamConfigInput
 ): Promise<ExamConfig> {
+  // Ensure tables exist
+  await ensureExamConfigsTable();
   // Validate question IDs exist
   const questionsResult = await sql`
     SELECT COUNT(*) as count
@@ -111,6 +111,9 @@ export async function startExamAttempt(
   participantId: string,
   examConfigId: string
 ): Promise<ExamAttemptV2> {
+  // Ensure tables exist
+  await ensureExamConfigsTable();
+  await ensureExamAttemptsTable();
   // Get exam config
   const config = await getExamConfigById(examConfigId);
   if (!config) {
@@ -229,6 +232,8 @@ export async function submitExam(
   answers: Record<string, any>,
   autoSubmit: boolean = false
 ): Promise<ExamAttemptV2> {
+  // Ensure tables exist
+  await ensureExamAttemptsTable();
   // Get attempt
   const attemptResult = await sql`
     SELECT * FROM exam_attempts_v2

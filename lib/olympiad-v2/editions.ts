@@ -3,15 +3,9 @@
  * Functions for creating and managing olympiad editions
  */
 
-import { neon } from '@neondatabase/serverless';
-import type {
-  OlympiadEdition,
-  CreateEditionInput,
-  EditionStatus,
-} from './types';
-import { DEFAULT_AGE_RULES, SUBJECTS_BY_LEVEL } from './constants';
-
-const sql = neon(process.env.DATABASE_URL!);
+import { sql, ensureOlympiadEditionsTable, ensureEditionStagesTable } from "./database"
+import { OlympiadEdition, EditionStatus, CreateEditionInput } from "./types"
+import { SUBJECTS_BY_LEVEL, DEFAULT_AGE_RULES } from "./constants";
 
 /**
  * Create a new olympiad edition
@@ -20,6 +14,10 @@ export async function createEdition(
   adminId: string,
   input: CreateEditionInput
 ): Promise<OlympiadEdition> {
+  // Ensure tables exist
+  await ensureOlympiadEditionsTable();
+  await ensureEditionStagesTable();
+  
   // Validate dates
   const enrollmentStart = new Date(input.enrollment_start);
   const enrollmentEnd = new Date(input.enrollment_end);
@@ -81,10 +79,12 @@ export async function createEdition(
 /**
  * Get edition by ID
  */
-export async function getEditionById(editionId: string): Promise<OlympiadEdition | null> {
+export async function getEditionById(id: string): Promise<OlympiadEdition | null> {
+  // Ensure tables exist
+  await ensureOlympiadEditionsTable();
   const result = await sql`
     SELECT * FROM olympiad_editions
-    WHERE id = ${editionId}
+    WHERE id = ${id}
   `;
 
   return result.length > 0 ? (result[0] as OlympiadEdition) : null;
@@ -97,6 +97,8 @@ export async function getAllEditions(filters?: {
   status?: EditionStatus;
   year?: number;
 }): Promise<OlympiadEdition[]> {
+  // Ensure tables exist
+  await ensureOlympiadEditionsTable();
   let query = sql`SELECT * FROM olympiad_editions WHERE 1=1`;
 
   if (filters?.status) {
@@ -113,30 +115,36 @@ export async function getAllEditions(filters?: {
 }
 
 /**
- * Update edition
+ * Update an edition
  */
 export async function updateEdition(
-  editionId: string,
-  updates: Partial<CreateEditionInput>
+  id: string,
+  updates: Partial<OlympiadEdition>
 ): Promise<OlympiadEdition> {
-  const existing = await getEditionById(editionId);
+  // Ensure tables exist
+  await ensureOlympiadEditionsTable();
+  const existing = await getEditionById(id);
   if (!existing) {
     throw new Error('Edition not found');
   }
 
+  // Fix type issues by casting to any for fields not in the type definition
+  const updatesAny = updates as any;
+  
   const result = await sql`
     UPDATE olympiad_editions
     SET
       name = COALESCE(${updates.name || null}, name),
       enrollment_start = COALESCE(${updates.enrollment_start || null}, enrollment_start),
       enrollment_end = COALESCE(${updates.enrollment_end || null}, enrollment_end),
+      min_age = COALESCE(${updatesAny.min_age || null}, min_age),
+      max_age = COALESCE(${updatesAny.max_age || null}, max_age),
       active_levels = COALESCE(${updates.active_levels ? JSON.stringify(updates.active_levels) : null}, active_levels),
-      active_subjects = COALESCE(${updates.active_subjects ? JSON.stringify(updates.active_subjects) : null}, active_subjects),
-      age_rules = COALESCE(${updates.age_rules ? JSON.stringify(updates.age_rules) : null}, age_rules),
+      status = COALESCE(${updates.status || null}, status),
       max_subjects_per_participant = COALESCE(${updates.max_subjects_per_participant || null}, max_subjects_per_participant),
       reference_date = COALESCE(${updates.reference_date || null}, reference_date),
-      updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${editionId}
+      updated_at = NOW()
+    WHERE id = ${id}
     RETURNING *
   `;
 
@@ -154,6 +162,8 @@ export async function updateEditionStatus(
   editionId: string,
   status: EditionStatus
 ): Promise<void> {
+  // Ensure tables exist
+  await ensureOlympiadEditionsTable();
   await sql`
     UPDATE olympiad_editions
     SET status = ${status}, updated_at = CURRENT_TIMESTAMP
@@ -181,6 +191,9 @@ export async function updateEditionStatus(
  * Get active (open) editions
  */
 export async function getActiveEditions(): Promise<OlympiadEdition[]> {
+  // Ensure tables exist
+  await ensureOlympiadEditionsTable();
+  
   const now = new Date().toISOString();
 
   const result = await sql`
@@ -203,6 +216,8 @@ export async function getEditionStatistics(editionId: string): Promise<{
   participants_by_type: Record<string, number>;
   total_subjects_enrolled: number;
 }> {
+  // Ensure tables exist
+  await ensureOlympiadEditionsTable();
   const participantsResult = await sql`
     SELECT
       COUNT(*) as total,
@@ -246,6 +261,8 @@ export async function getEditionStatistics(editionId: string): Promise<{
  * Delete edition (only if no participants)
  */
 export async function deleteEdition(editionId: string): Promise<void> {
+  // Ensure tables exist
+  await ensureOlympiadEditionsTable();
   // Check for participants
   const participantsResult = await sql`
     SELECT COUNT(*) as count

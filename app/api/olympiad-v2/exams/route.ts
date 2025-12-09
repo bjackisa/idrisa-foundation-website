@@ -2,9 +2,7 @@ import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { verifyAdminToken } from "@/lib/admin-auth"
 import { createExamConfig } from "@/lib/olympiad-v2/exams"
-import { neon } from "@neondatabase/serverless"
-
-const sql = neon(process.env.DATABASE_URL!)
+import { sql, ensureExamConfigsTable } from "@/lib/olympiad-v2/database"
 
 // GET exam configs for a stage
 export async function GET(request: Request) {
@@ -21,36 +19,39 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
+    // Ensure tables exist
+    await ensureExamConfigsTable()
+    
     const { searchParams } = new URL(request.url)
     const stageId = searchParams.get("stageId")
     const editionId = searchParams.get("editionId")
 
-    let query = `
-      SELECT 
+    // Build query parameters
+    let whereClause = ''
+    const params: any[] = []
+    
+    if (stageId) {
+      whereClause += ' AND ec.stage = $1'
+      params.push(stageId)
+    }
+    
+    if (editionId) {
+      whereClause += ` AND ec.edition_id = $${params.length + 1}`
+      params.push(editionId)
+    }
+
+    // Execute query with proper SQL template
+    const examConfigs = await sql.query(
+      `SELECT 
         ec.*,
-        es.stage_name,
-        es.stage_number,
         oe.name as edition_name,
         (SELECT COUNT(*) FROM exam_questions WHERE exam_config_id = ec.id) as question_count
       FROM exam_configs ec
-      JOIN edition_stages es ON ec.stage_id = es.id
       JOIN olympiad_editions oe ON ec.edition_id = oe.id
-      WHERE 1=1
-    `
-
-    const params: any[] = []
-    if (stageId) {
-      params.push(stageId)
-      query += ` AND ec.stage_id = $${params.length}`
-    }
-    if (editionId) {
-      params.push(editionId)
-      query += ` AND ec.edition_id = $${params.length}`
-    }
-
-    query += ` ORDER BY es.stage_number, ec.education_level`
-
-    const examConfigs = await sql(query, params)
+      WHERE 1=1 ${whereClause}
+      ORDER BY ec.stage, ec.education_level`,
+      params
+    )
 
     return NextResponse.json({ examConfigs })
   } catch (error: any) {
@@ -74,19 +75,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
+    // Ensure tables exist
+    await ensureExamConfigsTable()
+    
     const body = await request.json()
     const { 
       edition_id, 
-      stage_id, 
+      stage, 
       education_level, 
+      subject,
       duration_minutes, 
-      total_marks, 
-      pass_marks,
-      instructions,
+      start_datetime,
+      end_datetime,
       question_ids 
     } = body
 
-    if (!edition_id || !stage_id || !education_level || !duration_minutes || !total_marks || !pass_marks) {
+    if (!edition_id || !stage || !education_level || !subject || !duration_minutes || !start_datetime || !end_datetime) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -95,13 +99,17 @@ export async function POST(request: Request) {
 
     const examConfig = await createExamConfig({
       edition_id,
-      stage_id,
+      stage,
       education_level,
+      subject,
       duration_minutes,
-      total_marks,
-      pass_marks,
-      instructions,
-      question_ids: question_ids || []
+      start_datetime,
+      end_datetime,
+      question_ids: question_ids || [],
+      randomize_questions: body.randomize_questions,
+      randomize_options: body.randomize_options,
+      show_score_immediately: body.show_score_immediately,
+      score_release_datetime: body.score_release_datetime
     })
 
     return NextResponse.json({ examConfig }, { status: 201 })
@@ -126,6 +134,9 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 })
     }
 
+    // Ensure tables exist
+    await ensureExamConfigsTable()
+    
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
 
@@ -133,6 +144,18 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Exam config ID required" }, { status: 400 })
     }
 
+    // Check if there are any attempts for this exam
+    const attemptsResult = await sql.query(
+      "SELECT COUNT(*) as count FROM exam_attempts_v2 WHERE exam_config_id = $1",
+      [id]
+    )
+    
+    if (attemptsResult[0].count > 0) {
+      return NextResponse.json({ 
+        error: "Cannot delete exam config with existing attempts" 
+      }, { status: 400 })
+    }
+    
     await sql`DELETE FROM exam_configs WHERE id = ${id}`
 
     return NextResponse.json({ success: true })

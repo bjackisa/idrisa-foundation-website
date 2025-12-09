@@ -1,6 +1,6 @@
 import { getAdminSession } from "@/lib/session"
-import { deleteQuestion } from "@/lib/questions"
 import { type NextRequest, NextResponse } from "next/server"
+import { sql, ensureQuestionBankTable } from "@/lib/olympiad-v2/database"
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -8,7 +8,12 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { id } = await params
-    await deleteQuestion(id)
+    
+    // Ensure table exists
+    await ensureQuestionBankTable()
+    
+    // Delete the question
+    await sql`DELETE FROM question_bank WHERE id = ${id}`
 
     return NextResponse.json({ success: true })
   } catch (error) {
