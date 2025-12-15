@@ -2,6 +2,7 @@ import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import Link from "next/link"
 import { ArrowRight, Mail, ExternalLink, GraduationCap, Award, Globe, Heart } from "lucide-react"
+import { ImageWithFallback } from "@/components/image-with-fallback"
 
 export default function TeamPage() {
   return (
@@ -34,13 +35,11 @@ export default function TeamPage() {
               <div className="lg:col-span-1">
                 <div className="bg-card border border-border rounded-2xl p-8 card-hover sticky top-8">
                   <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 mx-auto mb-6 overflow-hidden border border-border">
-                    <img
+                    <ImageWithFallback
                       src="/team/kiryowa-idrisa.jpg"
                       alt="Idrisa Kiryowa"
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        ;(e.currentTarget as HTMLImageElement).src = "/placeholder-user.jpg"
-                      }}
+                      fallbackSrc="/placeholder-user.jpg"
                     />
                   </div>
                   <h3 className="text-2xl font-bold text-center mb-2 text-foreground">Idrisa Kiryowa</h3>
@@ -242,13 +241,11 @@ export default function TeamPage() {
                 <div key={member.name} className="bg-card border border-border rounded-2xl p-8 card-hover">
                   <div className="flex items-start gap-4 mb-6">
                     <div className="w-16 h-16 rounded-xl overflow-hidden border border-border bg-muted shrink-0">
-                      <img
+                      <ImageWithFallback
                         src={member.image || "/placeholder-user.jpg"}
                         alt={member.name}
                         className="w-full h-full object-cover"
-                        onError={(e) => {
-                          ;(e.currentTarget as HTMLImageElement).src = "/placeholder-user.jpg"
-                        }}
+                        fallbackSrc="/placeholder-user.jpg"
                       />
                     </div>
                     <div className="min-w-0">
