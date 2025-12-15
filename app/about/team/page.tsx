@@ -33,8 +33,15 @@ export default function TeamPage() {
               {/* Profile Card */}
               <div className="lg:col-span-1">
                 <div className="bg-card border border-border rounded-2xl p-8 card-hover sticky top-8">
-                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-accent mx-auto mb-6 flex items-center justify-center">
-                    <span className="text-4xl font-bold text-primary-foreground">IK</span>
+                  <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 mx-auto mb-6 overflow-hidden border border-border">
+                    <img
+                      src="/team/kiryowa-idrisa.jpg"
+                      alt="Idrisa Kiryowa"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        ;(e.currentTarget as HTMLImageElement).src = "/placeholder-user.jpg"
+                      }}
+                    />
                   </div>
                   <h3 className="text-2xl font-bold text-center mb-2 text-foreground">Idrisa Kiryowa</h3>
                   <p className="text-muted-foreground text-center mb-4">Founder & Executive Director</p>
@@ -42,11 +49,11 @@ export default function TeamPage() {
                   <div className="space-y-3 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <GraduationCap className="w-4 h-4 text-primary" />
-                      <span>Master's Student, Russia</span>
+                      <span>Scientist & STEM Mentor</span>
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Globe className="w-4 h-4 text-primary" />
-                      <span>Research Background, India</span>
+                      <span>Global Learning, Local Impact</span>
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Heart className="w-4 h-4 text-primary" />
@@ -99,16 +106,16 @@ export default function TeamPage() {
                   <h3 className="text-2xl font-bold text-foreground mb-4">Visionary Leadership</h3>
                   <p className="text-lg text-muted-foreground leading-relaxed mb-6">
                     <strong className="text-foreground">Idrisa Kiryowa</strong> is the visionary founder of the Idrisa Foundation, 
-                    established in 2025 with a mission to transform STEM education in Uganda. Currently pursuing his Master's degree 
-                    in Russia, Idrisa brings a wealth of international experience and scientific expertise to the foundation's leadership.
+                    established in 2025 with a mission to transform STEM education in Uganda. His story is rooted in Entebbe and shaped
+                    by a deep belief that the next great innovator is not in a distant lab, but in a school in Wakiso—or anywhere in Uganda—
+                    waiting for a chance.
                   </p>
 
                   <h4 className="text-xl font-semibold text-foreground mb-3">Academic & Research Background</h4>
                   <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                    With significant research contributions in medicine and various scientific fields, Idrisa has built a strong 
-                    academic foundation through advanced studies in India and now Russia. His research work has been published in 
-                    reputable scientific journals, contributing to the global scientific community while maintaining deep roots 
-                    in his Ugandan heritage.
+                    Idrisa has combined rigorous scientific training with real-world experience, building a practical understanding of how
+                    science and innovation can solve everyday challenges. Through TIFUL, he channels that experience into mentorship,
+                    scholarships, and opportunities that help young people grow into confident problem-solvers.
                   </p>
 
                   <div className="bg-primary text-primary-foreground rounded-2xl p-8 my-8">
@@ -175,6 +182,110 @@ export default function TeamPage() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Board & Core Team */}
+        <section className="py-20 px-4 bg-background">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-16">
+              <p className="text-accent font-semibold mb-3 text-sm uppercase tracking-wider">People Behind the Work</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-foreground">Board & Core Team</h2>
+              <p className="text-xl text-muted-foreground max-w-3xl mx-auto mt-4">
+                TIFUL is powered by professionals committed to integrity, service, and measurable impact for learners across Uganda.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[
+                {
+                  name: "Kiryowa Idrisa",
+                  position: "Founder & Director",
+                  info: "Biotech Scientist",
+                  image: "/team/kiryowa-idrisa.jpg",
+                },
+                {
+                  name: "Namala Aisha",
+                  position: "Director",
+                  info: "High School Teacher",
+                  image: "",
+                },
+                {
+                  name: "Naiga Amina",
+                  position: "Executive Secretary",
+                  info: "Businesswoman",
+                  image: "",
+                },
+                {
+                  name: "Kakungulu Abubakar",
+                  position: "Legal Advisor",
+                  info: "Lawyer",
+                  image: "",
+                },
+                {
+                  name: "Jackisa Daniel Barack",
+                  position: "IT & Operations",
+                  info: "Developer",
+                  image: "",
+                },
+                {
+                  name: "Kiwanuka Shakira",
+                  position: "General Secretary & Assistant Legal Advisor",
+                  info: "Paralegal at Greenwatch Advocates (legal research on human rights policies and legislation; supports drafting legal documents, policy briefs, and advocacy materials)",
+                  image: "/team/kiwanuka-shakira.jpg",
+                  email: "kiwashakira@gmail.com",
+                  phone: "+256750307950",
+                  quote: "A negative mind will never give you a positive response",
+                },
+              ].map((member) => (
+                <div key={member.name} className="bg-card border border-border rounded-2xl p-8 card-hover">
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden border border-border bg-muted shrink-0">
+                      <img
+                        src={member.image || "/placeholder-user.jpg"}
+                        alt={member.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          ;(e.currentTarget as HTMLImageElement).src = "/placeholder-user.jpg"
+                        }}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-xl font-bold text-foreground truncate">{member.name}</h3>
+                      <p className="text-primary font-semibold">{member.position}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{member.info}</p>
+                    </div>
+                  </div>
+
+                  {member.quote && (
+                    <div className="bg-muted/40 border border-border rounded-xl p-4 mb-6">
+                      <p className="text-sm text-foreground/80 italic">“{member.quote}”</p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-3">
+                    {member.email && (
+                      <a
+                        href={`mailto:${member.email}`}
+                        className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-border hover:bg-muted transition"
+                      >
+                        <Mail className="w-4 h-4 text-primary" />
+                        <span>Email</span>
+                      </a>
+                    )}
+                    {member.phone && (
+                      <a
+                        href={`tel:${member.phone}`}
+                        className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded-lg border border-border hover:bg-muted transition"
+                      >
+                        <span className="text-primary font-semibold">Call</span>
+                        <span className="text-muted-foreground">{member.phone}</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>

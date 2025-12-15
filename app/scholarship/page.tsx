@@ -1,10 +1,60 @@
+"use client"
+
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowRight, GraduationCap, DollarSign, Award, BookOpen, Users } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { ArrowRight, GraduationCap, DollarSign, Award, BookOpen } from "lucide-react"
+
+type ScholarshipListItem = {
+  id: number
+  type_code: string
+  type_name: string
+  slug: string
+  title: string
+  tagline: string | null
+  application_fee_ugx: number
+  is_active: boolean
+}
 
 export default function ScholarshipPage() {
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [items, setItems] = useState<ScholarshipListItem[]>([])
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      setError("")
+      try {
+        const res = await fetch("/api/scholarships", { cache: "no-store" })
+        const json = await res.json()
+        if (!res.ok) {
+          setError(json?.error || "Failed to load scholarships")
+          return
+        }
+        setItems((json?.scholarships || []).filter((s: ScholarshipListItem) => s.is_active))
+      } catch {
+        setError("Failed to load scholarships")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    load()
+  }, [])
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, { typeName: string; items: ScholarshipListItem[] }>()
+    for (const s of items) {
+      const key = s.type_code
+      if (!map.has(key)) map.set(key, { typeName: s.type_name, items: [] })
+      map.get(key)!.items.push(s)
+    }
+    return Array.from(map.entries()).map(([code, v]) => ({ code, ...v }))
+  }, [items])
+
   return (
     <>
       <Header />
@@ -23,9 +73,9 @@ export default function ScholarshipPage() {
               Our scholarships make quality education accessible to deserving students across Uganda.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/scholarship/signup">
+              <Link href="#available-scholarships">
                 <Button size="lg" className="bg-background text-primary hover:bg-muted">
-                  Apply for Scholarship <ArrowRight className="w-4 h-4 ml-2" />
+                  Explore Scholarships <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
               <Link href="/programs">
@@ -37,79 +87,54 @@ export default function ScholarshipPage() {
           </div>
         </section>
 
-        {/* Scholarship Types */}
-        <section className="py-20 px-4 bg-background">
+        {/* Scholarships */}
+        <section id="available-scholarships" className="py-20 px-4 bg-background">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
               <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
                 Available Scholarship Opportunities
               </h2>
               <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-                We offer various scholarship types to support different educational needs and academic levels.
+                Choose a named scholarship to view its purpose, eligibility criteria, and application steps.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <div className="bg-card border border-border rounded-2xl p-8 card-hover">
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-                  <DollarSign className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold mb-4 text-foreground">Full Tuition Scholarships</h3>
-                <p className="text-muted-foreground mb-6">
-                  Complete coverage of tuition fees for exceptional students demonstrating academic excellence 
-                  and financial need. Available for primary, secondary, and university levels.
-                </p>
-                <ul className="text-sm text-muted-foreground space-y-2 mb-6">
-                  <li>• 100% tuition coverage</li>
-                  <li>• Textbook allowance</li>
-                  <li>• Mentorship program</li>
-                  <li>• Academic support</li>
-                </ul>
-                <Link href="/scholarship/signup?type=full-tuition">
-                  <Button className="w-full">Apply Now</Button>
-                </Link>
-              </div>
+            {loading && <p className="text-muted-foreground text-center">Loading scholarships…</p>}
+            {!loading && error && <p className="text-destructive text-center">{error}</p>}
 
-              <div className="bg-card border border-border rounded-2xl p-8 card-hover">
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-                  <BookOpen className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold mb-4 text-foreground">Partial Scholarships</h3>
-                <p className="text-muted-foreground mb-6">
-                  Partial financial support covering 50-75% of tuition costs for students who demonstrate 
-                  strong academic potential and moderate financial need.
-                </p>
-                <ul className="text-sm text-muted-foreground space-y-2 mb-6">
-                  <li>• 50-75% tuition coverage</li>
-                  <li>• Study materials support</li>
-                  <li>• Career guidance</li>
-                  <li>• Network access</li>
-                </ul>
-                <Link href="/scholarship/signup?type=partial">
-                  <Button className="w-full">Apply Now</Button>
-                </Link>
-              </div>
+            {!loading && !error && grouped.length > 0 && (
+              <div className="space-y-12">
+                {grouped.map((group) => (
+                  <div key={group.code}>
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-2xl font-bold text-foreground">{group.typeName}</h3>
+                      <div className="text-sm text-muted-foreground">Application fee: UGX 0</div>
+                    </div>
 
-              <div className="bg-card border border-border rounded-2xl p-8 card-hover">
-                <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-                  <Award className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-2xl font-bold mb-4 text-foreground">Excellence Awards</h3>
-                <p className="text-muted-foreground mb-6">
-                  Merit-based awards for top-performing students in STEM competitions and examinations. 
-                  Recognizes and rewards outstanding academic achievement.
-                </p>
-                <ul className="text-sm text-muted-foreground space-y-2 mb-6">
-                  <li>• One-time awards</li>
-                  <li>• Recognition certificates</li>
-                  <li>• Internship opportunities</li>
-                  <li>• Industry exposure</li>
-                </ul>
-                <Link href="/scholarship/signup?type=excellence">
-                  <Button className="w-full">Apply Now</Button>
-                </Link>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      {group.items.map((s) => (
+                        <div key={s.id} className="bg-card border border-border rounded-2xl p-8 card-hover">
+                          <div className="w-14 h-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
+                            {group.code === "FULL" ? (
+                              <DollarSign className="w-7 h-7 text-primary" />
+                            ) : group.code === "PARTIAL" ? (
+                              <BookOpen className="w-7 h-7 text-primary" />
+                            ) : (
+                              <Award className="w-7 h-7 text-primary" />
+                            )}
+                          </div>
+                          <h4 className="text-xl font-bold mb-2 text-foreground">{s.title}</h4>
+                          <p className="text-muted-foreground mb-6">{s.tagline || "View details, eligibility, and how to apply."}</p>
+                          <Link href={`/scholarship/${encodeURIComponent(s.slug)}`}>
+                            <Button className="w-full">View Scholarship</Button>
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
         </section>
 
@@ -267,9 +292,9 @@ export default function ScholarshipPage() {
               Take the first step towards securing your educational future. 
               Our scholarship application is now open for the 2025-2026 academic year.
             </p>
-            <Link href="/scholarship/signup">
+            <Link href="#available-scholarships">
               <Button size="lg" className="bg-background text-primary hover:bg-muted">
-                Start Your Application <ArrowRight className="w-4 h-4 ml-2" />
+                Choose a Scholarship <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
           </div>

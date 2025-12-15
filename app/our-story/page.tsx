@@ -28,10 +28,10 @@ export default function OurStory() {
                     researcher dedicated to transforming Uganda's educational landscape.
                   </p>
                   <p className="text-lg text-foreground/80 leading-relaxed">
-                    Idrisa is a Master's degree student in Russia with an impressive international academic
-                    journey—studying in India and conducting significant research across multiple disciplines,
-                    particularly in medical sciences. His achievements stand as testament to the power of quality
-                    education and dedicated mentorship.
+                    The foundation was born from a personal journey of overcoming adversity and discovering what becomes
+                    possible when curiosity is nurtured. Idrisa's path—from local classrooms to global learning—revealed
+                    a critical gap: the immense, untapped potential of young scientists in Uganda is often overlooked
+                    and under-supported.
                   </p>
                   <p className="text-lg text-foreground/80 leading-relaxed">
                     Despite his international success and opportunities abroad, Idrisa never forgot his roots. He
@@ -54,10 +54,8 @@ export default function OurStory() {
                   <div className="border-t border-primary-foreground/20 pt-8 space-y-6">
                     <div>
                       <p className="text-sm text-primary-foreground/70 mb-2">Education</p>
-                      <p className="font-semibold">Master's Degree Student, Russia</p>
-                      <p className="text-sm text-primary-foreground/80">
-                        Studied in India • Medical Research Specialist
-                      </p>
+                      <p className="font-semibold">Scientist, Mentor & Founder</p>
+                      <p className="text-sm text-primary-foreground/80">A journey shaped by global learning and local purpose</p>
                     </div>
                     <div>
                       <p className="text-sm text-primary-foreground/70 mb-2">Mission</p>

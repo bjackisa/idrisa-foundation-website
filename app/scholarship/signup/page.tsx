@@ -17,18 +17,12 @@ const UGANDA_DISTRICTS = [
   "Karenga", "Kaabong", "Kotido"
 ]
 
-const SCHOLARSHIP_TYPES = [
-  { id: "full-tuition", name: "Full Tuition Scholarship", description: "Complete tuition coverage" },
-  { id: "partial", name: "Partial Scholarship", description: "50-75% tuition coverage" },
-  { id: "excellence", name: "Excellence Award", description: "Merit-based recognition award" }
-]
-
 type Step = "personal" | "academic" | "financial" | "documents"
 
 function ScholarshipSignupContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const scholarshipType = searchParams.get("type") || "full-tuition"
+  const scholarshipSlug = searchParams.get("scholarship") || ""
   
   const [step, setStep] = useState<Step>("personal")
   const [personalData, setPersonalData] = useState({
@@ -62,9 +56,14 @@ function ScholarshipSignupContent() {
     financialStatement: "",
     specialCircumstances: "",
   })
-  const [selectedScholarship, setSelectedScholarship] = useState(scholarshipType)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!scholarshipSlug) {
+      setError("Please choose a scholarship first. You will be guided through eligibility before applying.")
+    }
+  }, [scholarshipSlug])
 
   const handlePersonalChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setPersonalData({
@@ -91,6 +90,11 @@ function ScholarshipSignupContent() {
     e.preventDefault()
     setError("")
 
+    if (!scholarshipSlug) {
+      setError("Please choose a scholarship first. You will be guided through eligibility before applying.")
+      return
+    }
+
     if (personalData.password !== personalData.confirmPassword) {
       setError("Passwords do not match")
       return
@@ -116,6 +120,11 @@ function ScholarshipSignupContent() {
     e.preventDefault()
     setError("")
 
+    if (!scholarshipSlug) {
+      setError("Please choose a scholarship first. You will be guided through eligibility before applying.")
+      return
+    }
+
     const requiredFields = ["currentSchool", "educationLevel", "gpa", "stemSubjects"]
     for (const field of requiredFields) {
       if (!academicData[field as keyof typeof academicData]) {
@@ -130,6 +139,11 @@ function ScholarshipSignupContent() {
   const handleFinancialSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+
+    if (!scholarshipSlug) {
+      setError("Please choose a scholarship first. You will be guided through eligibility before applying.")
+      return
+    }
 
     const requiredFields = ["familyIncome", "familySize", "parentsOccupation"]
     for (const field of requiredFields) {
@@ -146,6 +160,12 @@ function ScholarshipSignupContent() {
     e.preventDefault()
     setError("")
     setLoading(true)
+
+    if (!scholarshipSlug) {
+      setLoading(false)
+      setError("Please choose a scholarship first. You will be guided through eligibility before applying.")
+      return
+    }
 
     try {
       const formData = new FormData()
@@ -164,8 +184,8 @@ function ScholarshipSignupContent() {
       Object.entries(financialData).forEach(([key, value]) => {
         formData.append(key, value)
       })
-      
-      formData.append("scholarshipType", selectedScholarship)
+
+      formData.append("scholarshipSlug", scholarshipSlug)
 
       const response = await fetch("/api/scholarship/signup", {
         method: "POST",
@@ -239,39 +259,19 @@ function ScholarshipSignupContent() {
           </p>
         </div>
 
-        {/* Scholarship Type Selection */}
-        {step === "personal" && (
+        {error && <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-6">{error}</div>}
+
+        {!scholarshipSlug && (
           <div className="mb-6">
-            <label className="block text-sm font-medium text-foreground mb-3">
-              Scholarship Type
-            </label>
-            <div className="space-y-2">
-              {SCHOLARSHIP_TYPES.map((type) => (
-                <label
-                  key={type.id}
-                  className="flex items-center p-3 border border-border rounded-lg cursor-pointer hover:bg-muted"
-                >
-                  <input
-                    type="radio"
-                    name="scholarshipType"
-                    value={type.id}
-                    checked={selectedScholarship === type.id}
-                    onChange={(e) => setSelectedScholarship(e.target.value)}
-                    className="mr-3"
-                  />
-                  <div>
-                    <div className="font-medium text-foreground">{type.name}</div>
-                    <div className="text-sm text-muted-foreground">{type.description}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
+            <Link href="/scholarship">
+              <Button variant="outline" className="w-full">
+                Back to Scholarships
+              </Button>
+            </Link>
           </div>
         )}
 
-        {error && <div className="bg-red-50 text-red-700 p-4 rounded-lg mb-6">{error}</div>}
-
-        {step === "personal" && (
+        {scholarshipSlug && step === "personal" && (
           <form onSubmit={handlePersonalSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -412,7 +412,7 @@ function ScholarshipSignupContent() {
           </form>
         )}
 
-        {step === "academic" && (
+        {scholarshipSlug && step === "academic" && (
           <form onSubmit={handleAcademicSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -543,7 +543,7 @@ function ScholarshipSignupContent() {
           </form>
         )}
 
-        {step === "financial" && (
+        {scholarshipSlug && step === "financial" && (
           <form onSubmit={handleFinancialSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -622,8 +622,8 @@ function ScholarshipSignupContent() {
           </form>
         )}
 
-        {step === "documents" && (
-          <form onSubmit={handleFinalSubmit} className="space-y-6">
+        {scholarshipSlug && step === "documents" && (
+          <form onSubmit={handleFinalSubmit} className="space-y-4">
             <div className="bg-muted rounded-lg p-6">
               <h3 className="text-lg font-semibold mb-4 text-foreground">Application Summary</h3>
               
@@ -638,7 +638,7 @@ function ScholarshipSignupContent() {
                   <span className="font-medium text-foreground">School:</span> {academicData.currentSchool}
                 </div>
                 <div>
-                  <span className="font-medium text-foreground">Scholarship Type:</span> {SCHOLARSHIP_TYPES.find(t => t.id === selectedScholarship)?.name}
+                  <span className="font-medium text-foreground">Scholarship:</span> {scholarshipSlug}
                 </div>
                 <div>
                   <span className="font-medium text-foreground">Family Income Range:</span> {financialData.familyIncome}
@@ -671,12 +671,6 @@ function ScholarshipSignupContent() {
           </form>
         )}
 
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Already have an account?{" "}
-          <Link href="/scholarship/login" className="text-primary font-semibold hover:underline">
-            Log in
-          </Link>
-        </p>
       </div>
     </div>
   )

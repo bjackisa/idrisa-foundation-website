@@ -17,7 +17,7 @@ export default function ScholarshipDashboard() {
                 <h1 className="text-3xl font-bold text-foreground mb-2">Scholarship Dashboard</h1>
                 <p className="text-muted-foreground">Manage your scholarship applications and track your progress</p>
               </div>
-              <Link href="/scholarship/signup">
+              <Link href="/scholarship">
                 <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
                   New Application <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>

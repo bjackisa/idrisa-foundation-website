@@ -33,8 +33,8 @@ export default function AboutPage() {
                   </div>
                   <h2 className="text-2xl font-bold mb-3 text-foreground">Our Story & Mission</h2>
                   <p className="text-muted-foreground mb-6">
-                    Learn how a vision born in Russia and nurtured in India is transforming STEM education in Uganda.
-                    Discover our mission, vision, and the values that drive us.
+                    Learn how a personal journey of resilience and purpose is transforming STEM education in Uganda.
+                    Discover our mission, vision, and the values that drive our work.
                   </p>
                   <span className="inline-flex items-center gap-2 text-primary font-semibold group-hover:gap-3 transition-all">
                     Read Our Story <ArrowRight className="w-4 h-4" />

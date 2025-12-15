@@ -35,6 +35,15 @@ const menuItems = [
     icon: LayoutDashboard,
   },
   {
+    title: "Scholarships",
+    href: "/admin/scholarships",
+    icon: Award,
+    submenu: [
+      { title: "Scholarships", href: "/admin/scholarships", icon: Award },
+      { title: "Types", href: "/admin/scholarships/types", icon: BookOpen },
+    ],
+  },
+  {
     title: "Olympiad",
     href: "/admin/olympiad",
     icon: Trophy,
@@ -63,7 +72,7 @@ export function AdminSidebar({ admin, onLogout }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(["Olympiad"])
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(["Scholarships", "Olympiad"])
 
   const toggleSubmenu = (title: string) => {
     setExpandedMenus((prev) =>

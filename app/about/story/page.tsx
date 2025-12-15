@@ -37,7 +37,7 @@ export default function OurStoryPage() {
           <div className="max-w-7xl mx-auto">
             <p className="text-accent font-semibold mb-4">Our Story</p>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 max-w-4xl">
-              From a Dream in Russia to Impact in Uganda
+              Born from a Vision to Transform Lives
             </h1>
           </div>
         </section>
@@ -48,8 +48,8 @@ export default function OurStoryPage() {
             <div className="prose prose-lg max-w-none">
               <p className="text-xl text-muted-foreground leading-relaxed mb-8">
                 The Idrisa Foundation (U) Limited was established in 2025 by{" "}
-                <strong className="text-foreground">Idrisa Kiryowa</strong>, a visionary Master's degree student
-                pursuing his studies in Russia after completing significant research and education in India.
+                <strong className="text-foreground">Idrisa Kiryowa</strong>, inspired by a personal journey of
+                overcoming adversity and discovering untapped STEM potential in Ugandan classrooms.
                 His scientific credibility can be verified through his{" "}
                 <a 
                   href="https://orcid.org/0009-0007-3178-0424" 
@@ -81,15 +81,13 @@ export default function OurStoryPage() {
               </p>
 
               <p className="text-lg text-muted-foreground leading-relaxed mb-8">
-                Having witnessed firsthand the transformative power of quality education and international exposure,
-                Idrisa recognized a critical gap in his homeland. Thousands of brilliant young minds across Uganda were
-                struggling to access the same opportunities that had shaped his own journey—quality STEM education,
-                mentorship from working scientists, and the resources needed to pursue their dreams.
+                Idrisa's path showed him a critical gap in his homeland: brilliant young minds across Uganda are often
+                overlooked and under-supported. Many students have curiosity and talent, but lack the guidance,
+                mentorship, learning resources, and platforms needed to develop their ideas into real solutions.
               </p>
 
               <p className="text-lg text-muted-foreground leading-relaxed mb-8">
-                With significant research contributions in medicine and other scientific fields—published through
-                reputable{" "}
+                With hands-on scientific training and experience—documented through reputable{" "}
                 <a 
                   href="https://www.elsevier.com" 
                   target="_blank" 
@@ -98,17 +96,15 @@ export default function OurStoryPage() {
                 >
                   publishing houses
                 </a>
-                and verified by international scientific databases—Idrisa founded the
-                Idrisa Foundation as his way of giving back to Uganda and his hometown of Entebbe. The Foundation
-                represents his belief that every young person, regardless of their circumstances, deserves the
-                opportunity to thrive and contribute to scientific progress.
+                and verified by international scientific databases—Idrisa founded The Idrisa Foundation to give back to
+                Uganda and his hometown of Entebbe. The Foundation exists to find young scientists, nurture their
+                curiosity, and ensure their ideas can be heard, seen, and developed into the solutions of tomorrow.
               </p>
 
               <div className="bg-primary text-primary-foreground rounded-2xl p-8 my-12">
                 <blockquote className="text-xl italic leading-relaxed">
-                  "I was fortunate to receive opportunities that changed my life. Now, my mission is to ensure that
-                  talented young Ugandans don't have to leave their country to find those same opportunities. We're
-                  building them right here."
+                  "Challenges and problems are like strong storms; they won’t last forever, but their effects can last
+                  generations. Don’t trust them."
                 </blockquote>
                 <p className="mt-4 font-semibold">— Idrisa Kiryowa, Founder</p>
               </div>

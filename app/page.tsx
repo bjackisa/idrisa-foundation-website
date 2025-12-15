@@ -217,10 +217,9 @@ export default function Home() {
 
                   <div className="space-y-6 text-lg text-muted-foreground leading-relaxed">
                     <p>
-                      In 2025, <strong className="text-foreground">Idrisa Kiryowa</strong>, a Masters degree student in
-                      Russia with academic foundations from India and significant contributions to medical research,
-                      founded The Idrisa Foundation with a singular mission: to give back to his homeland Uganda and his
-                      beloved hometown of Entebbe.
+                      In 2025, <strong className="text-foreground">Idrisa Kiryowa</strong> founded The Idrisa Foundation
+                      with a singular mission: to give back to Uganda and his beloved hometown of Entebbe by expanding
+                      access to STEM opportunity, mentorship, and pathways for young innovators.
                     </p>
                     <p>
                       Having experienced firsthand the transformative power of education and international exposure,
