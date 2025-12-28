@@ -78,21 +78,21 @@ export function Header() {
     },
     {
       label: "Our Programs",
-      href: "/programs",
+      href: "/our-programs",
       dropdown: [
         { label: "STEM Olympiad", href: "/olympiad", icon: Trophy },
         { label: "Scholarships", href: "/scholarship", icon: GraduationCap },
-        { label: "Mentorship & Incubation", href: "/programs/mentorship", icon: Users },
+        { label: "Mentorship & Incubation", href: "/our-programs/mentorship-incubation", icon: Users },
       ],
     },
     {
       label: "For Scholars",
-      href: "/scholars",
+      href: "/scholarship",
       dropdown: [
-        { label: "How to Apply", href: "/scholars/apply", icon: FileText },
+        { label: "How to Apply", href: "/scholarship/how-to-apply", icon: FileText },
         { label: "Application Portal", href: "/participant/signup", icon: UserPlus },
-        { label: "Scholar Resources", href: "/scholars/resources", icon: BookOpen },
-        { label: "FAQs", href: "/scholars/faqs", icon: BookOpen },
+        { label: "Scholar Resources", href: "/scholarship/resources", icon: BookOpen },
+        { label: "FAQs", href: "/scholarship/faq", icon: BookOpen },
       ],
     },
     {
