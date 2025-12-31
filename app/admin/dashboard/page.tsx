@@ -18,6 +18,8 @@ import {
   Target,
   Clock,
   Plus,
+  Heart,
+  Building,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -142,6 +144,57 @@ export default function AdminDashboard() {
     },
   ]
 
+  const contentActions = [
+    {
+      title: "Publications",
+      description: "Manage research & resources",
+      href: "/admin/content/publications",
+      icon: BookOpen,
+      color: "from-indigo-500 to-indigo-600",
+      bgColor: "bg-indigo-50 dark:bg-indigo-950",
+    },
+    {
+      title: "Donations",
+      description: "Track pledges & payments",
+      href: "/admin/content/donations",
+      icon: Heart,
+      color: "from-red-500 to-red-600",
+      bgColor: "bg-red-50 dark:bg-red-950",
+    },
+    {
+      title: "Partnerships",
+      description: "Manage partner requests",
+      href: "/admin/content/partnerships",
+      icon: Building,
+      color: "from-teal-500 to-teal-600",
+      bgColor: "bg-teal-50 dark:bg-teal-950",
+    },
+    {
+      title: "Volunteers",
+      description: "Review applications",
+      href: "/admin/content/volunteers",
+      icon: Users,
+      color: "from-cyan-500 to-cyan-600",
+      bgColor: "bg-cyan-50 dark:bg-cyan-950",
+    },
+    {
+      title: "Blog Posts",
+      description: "Create & publish articles",
+      href: "/admin/content/blog",
+      icon: FileText,
+      color: "from-violet-500 to-violet-600",
+      bgColor: "bg-violet-50 dark:bg-violet-950",
+    },
+    {
+      title: "Events",
+      description: "Manage event calendar",
+      href: "/admin/content/events",
+      icon: Calendar,
+      color: "from-amber-500 to-amber-600",
+      bgColor: "bg-amber-50 dark:bg-amber-950",
+    },
+  ]
+
   const statCards = [
     {
       title: "Total Editions",
@@ -241,6 +294,28 @@ export default function AdminDashboard() {
         <h2 className="text-xl font-semibold mb-4">Olympiad Management</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {quickActions.map((action) => (
+            <Link key={action.title} href={action.href}>
+              <div
+                className={`${action.bgColor} border border-border rounded-xl p-4 hover:shadow-lg transition-all hover:-translate-y-0.5 cursor-pointer h-full`}
+              >
+                <div
+                  className={`w-10 h-10 rounded-lg bg-gradient-to-br ${action.color} flex items-center justify-center mb-3`}
+                >
+                  <action.icon className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="font-semibold text-sm">{action.title}</h3>
+                <p className="text-xs text-muted-foreground mt-1">{action.description}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Content Management */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">Content Management</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {contentActions.map((action) => (
             <Link key={action.title} href={action.href}>
               <div
                 className={`${action.bgColor} border border-border rounded-xl p-4 hover:shadow-lg transition-all hover:-translate-y-0.5 cursor-pointer h-full`}
