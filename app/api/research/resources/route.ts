@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { neon } from "@neondatabase/serverless"
 
-const sql = neon(process.env.DATABASE_URL!)
+const sql = process.env.DATABASE_URL ? neon(process.env.DATABASE_URL) : null
 
 export async function GET() {
+  if (!sql) {
+    return NextResponse.json({ resources: [] })
+  }
+  
   try {
     const resources = await sql`
       SELECT * FROM featured_resources 
